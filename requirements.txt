@@ -1,0 +1,4 @@
+Django==1.9.4
+djangorestframework==3.3.2
+future==0.15.2
+swingtix-bookkeeper==0.0.6
