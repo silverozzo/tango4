@@ -18,7 +18,7 @@ class PurchaseAdmin(admin.ModelAdmin):
 	list_display = ('stuff', 'provider', 'transaction_list')
 	
 	def transaction_list(self, obj):
-		return ";".join(obj.transactions.values_list('description', flat=True))
+		return '; '.join(obj.transactions.values_list('description', flat=True))
 
 
 class RecipeIngredientInline(admin.TabularInline):
