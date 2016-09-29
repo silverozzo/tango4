@@ -1,44 +1,48 @@
-from django.contrib             import admin
-from swingtix.bookkeeper.models import BookSet, Account, AccountEntry, Transaction
+from django.contrib import admin
+from swingtix.bookkeeper.models import (
+    BookSet, Account, AccountEntry, Transaction)
 
-from bar.models import FoodStuff, FoodProvider, Purchase, CashBox
-from bar.models import Recipe, RecipeIngredient, Product, SaleOffer, Calculation
+from models import FoodStuff, FoodProvider, Purchase, CashBox
+from models import (
+    Recipe, RecipeIngredient, Product, SaleOffer, Calculation)
 
 
 class AccountEntryInline(admin.TabularInline):
-	model = AccountEntry
+    model = AccountEntry
 
 
 class AccountAdmin(admin.ModelAdmin):
-	inlines = (AccountEntryInline,)
+    inlines = (AccountEntryInline,)
 
 
 class PurchaseAdmin(admin.ModelAdmin):
-	model        = Purchase
-	list_display = ('stuff', 'provider', 'transaction_list')
-	
-	def transaction_list(self, obj):
-		return '; '.join(obj.transactions.values_list('description', flat=True))
+    model = Purchase
+    list_display = ('stuff', 'provider', 'transaction_list')
+
+    @staticmethod
+    def transaction_list(obj):
+        return '; '.join(
+            obj.transactions.values_list('description', flat=True))
 
 
 class RecipeIngredientInline(admin.TabularInline):
-	model = RecipeIngredient
+    model = RecipeIngredient
 
 
 class RecipeAdmin(admin.ModelAdmin):
-	model   = Recipe
-	inlines = (RecipeIngredientInline,)
+    model = Recipe
+    inlines = (RecipeIngredientInline,)
 
 
 class CalculationInline(admin.TabularInline):
-	model = Calculation
+    model = Calculation
 
 
 class SaleOfferAdmin(admin.ModelAdmin):
-	model        = SaleOffer
-	inlines      = (CalculationInline,)
-	list_display = ('product', 'price', 'is_actual')
-	list_filter  = ('is_actual',)
+    model = SaleOffer
+    inlines = (CalculationInline,)
+    list_display = ('product', 'price', 'is_actual')
+    list_filter = ('is_actual',)
 
 
 admin.site.register(BookSet)
