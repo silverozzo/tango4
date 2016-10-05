@@ -73,6 +73,8 @@ class FoodStuff(models.Model):
 
 class Recipe(models.Model):
     name = models.CharField(max_length=200)
+    cooking = models.TextField(null=True, blank=True)
+    inventory = models.TextField(null=True, blank=True)
 
     def __unicode__(self):
         return self.name
