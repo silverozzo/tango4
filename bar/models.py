@@ -7,7 +7,11 @@ from swingtix.bookkeeper.models import Account, BookSet, Transaction
 
 BOOKSET_MATERIAL_DESCRIPTION = 'material'
 BOOKSET_MONETARY_DESCRIPTION = 'monetary'
-CASHBOX_MAIN_CODE_NAME = 'cash'
+CASHBOX_MAIN_CODE_NAME       = 'cash'
+
+PURCHASE_SUPPLY_MONETARY  = 'supply from provider to stuff'
+PURCHASE_SUPPLY_MATERIAL  = 'supply from provider to stuff'
+PURCHASE_DELIVERY_PAYMENT = 'payment for delivery'
 
 
 def get_bookset(description):
@@ -97,7 +101,8 @@ class Product(models.Model):
         return self.name
 
     def prepare_price(self, cost):
-        price = (cost * self.markup) / (Decimal(10) ** int(self.rounding))
+        price = Decimal(cost * self.markup)
+        price /= Decimal(10) ** int(self.rounding)
         price = price.quantize(Decimal(1), rounding=ROUND_UP)
         price *= Decimal(10) ** int(self.rounding)
         return price
@@ -237,17 +242,17 @@ class Purchase(models.Model):
 
         res = self.stuff.material_account.post(
             full_count, self.provider.material_account,
-            'supply from provider to stuff')
+            PURCHASE_SUPPLY_MATERIAL)
         self.transactions.add(res[0].transaction)
 
         res = self.stuff.monetary_account.post(
             self.cost, self.provider.monetary_account,
-            'supply from provider to stuff')
+            PURCHASE_SUPPLY_MONETARY)
         self.transactions.add(res[0].transaction)
 
         cashbox = get_main_cashbox()
         res = self.provider.monetary_account.post(
-            self.cost, cashbox.account, 'payment for delivery')
+            self.cost, cashbox.account, PURCHASE_DELIVERY_PAYMENT)
         self.transactions.add(res[0].transaction)
 
         return result
