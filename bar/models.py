@@ -103,7 +103,7 @@ class Product(models.Model):
         return self.name
 
     def prepare_price(self, cost):
-        price = Decimal(cost * self.markup)
+        price = Decimal(cost) * Decimal(self.markup)
         price /= Decimal(10) ** int(self.rounding)
         price = price.quantize(Decimal(1), rounding=ROUND_UP)
         price *= Decimal(10) ** int(self.rounding)
@@ -113,6 +113,7 @@ class Product(models.Model):
 class SaleOffer(models.Model):
     product = models.ForeignKey(Product)
     is_actual = models.BooleanField(default=True)
+    cost = models.DecimalField(max_digits=8, decimal_places=2, default=0)
     price = models.DecimalField(max_digits=8, decimal_places=2, default=0)
     when = models.DateTimeField(auto_now=True)
     feasible = models.BooleanField(default=False)
@@ -139,6 +140,7 @@ class SaleOffer(models.Model):
                 self.feasible = False
             full_cost += calc.monetary_count
 
+        self.cost = full_cost
         self.price = self.product.prepare_price(full_cost)
 
         result = super(SaleOffer, self).save(*args, **kwargs)
@@ -147,8 +149,9 @@ class SaleOffer(models.Model):
 
 
 class Calculation(models.Model):
-    sale_offer = models.ForeignKey(SaleOffer)
-    ingredient = models.ForeignKey(RecipeIngredient)
+    sale_offer = models.ForeignKey(SaleOffer, related_name='calculations')
+    ingredient = models.ForeignKey(
+        RecipeIngredient, related_name='calculations')
     material_count = models.DecimalField(
         max_digits=8, decimal_places=2, default=0)
     monetary_count = models.DecimalField(
@@ -157,7 +160,8 @@ class Calculation(models.Model):
 
     @staticmethod
     def create(offer, ingredient):
-        monetary_count = ingredient.count * ingredient.stuff.get_unit_cost()
+        monetary_count = Decimal(ingredient.count) * \
+            Decimal(ingredient.stuff.get_unit_cost())
         feasible = ingredient.count <= ingredient.stuff.get_material_count()
 
         calc = Calculation(

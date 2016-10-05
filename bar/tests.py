@@ -126,17 +126,37 @@ class ProductTests(TestCase):
 
 class SaleOfferTests(TestCase):
     def setUp(self):
-        stuff = FoodStuff(name='some stuff 3')
-        stuff.save()
+        self.stuff = FoodStuff(name='some stuff 3')
+        self.stuff.save()
 
         recipe = Recipe(name='some recipe 3')
         recipe.save()
 
-        ingredient = RecipeIngredient(stuff=stuff, recipe=recipe, count=1.5)
+        ingredient = RecipeIngredient(
+            stuff  = self.stuff,
+            recipe = recipe,
+            count  = 1.5
+        )
         ingredient.save()
 
-        self.product = Product(name='some product 3', recipe=recipe)
+        self.product = Product(
+            name   = 'some product 3',
+            recipe = recipe,
+            markup = 1.5
+        )
         self.product.save()
+
+        provider = FoodProvider(name='some provider')
+        provider.save()
+
+        purchase = Purchase(
+            provider   = provider,
+            stuff      = self.stuff,
+            cost       = 200,
+            unit_count = 10,
+            unit_size  = 1,
+        )
+        purchase.save()
 
         self.offer = SaleOffer(product=self.product)
         self.offer.save()
@@ -153,17 +173,21 @@ class SaleOfferTests(TestCase):
         self.offer.refresh_from_db()
         self.assertEqual(False, self.offer.is_actual)
 
+    def test_save(self):
+        self.assertEqual(30, self.offer.cost)
+        self.assertEqual(50, self.offer.price)
+
 
 class CalculationTests(TestCase):
     def setUp(self):
-        stuff = FoodStuff(name='some stuff 4')
-        stuff.save()
+        self.stuff = FoodStuff(name='some stuff 4')
+        self.stuff.save()
 
         recipe = Recipe(name='some recipe 4')
         recipe.save()
 
         self.ingredient = RecipeIngredient(
-            stuff  = stuff,
+            stuff  = self.stuff,
             recipe = recipe,
             count  = 1.5
         )
@@ -178,6 +202,26 @@ class CalculationTests(TestCase):
     def test_create_with_only_material_count(self):
         check = Calculation.create(self.offer, self.ingredient)
         self.assertEqual(1.5, check.material_count)
+        self.assertFalse(check.feasible)
+        self.assertEqual(0, check.monetary_count)
+
+    def test_create(self):
+        provider = FoodProvider(name='some provider')
+        provider.save()
+
+        purchase = Purchase(
+            provider   = provider,
+            stuff      = self.stuff,
+            cost       = 200,
+            unit_count = 10,
+            unit_size  = 1,
+        )
+        purchase.save()
+
+        check = Calculation.create(self.offer, self.ingredient)
+        self.assertEqual(1.5, check.material_count)
+        self.assertTrue(check.feasible)
+        self.assertEqual(30, check.monetary_count)
 
 
 class CashBoxTests(TestCase):
