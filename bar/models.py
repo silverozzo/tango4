@@ -8,10 +8,17 @@ from swingtix.bookkeeper.models import Account, BookSet, Transaction
 BOOKSET_MATERIAL_DESCRIPTION = 'material'
 BOOKSET_MONETARY_DESCRIPTION = 'monetary'
 CASHBOX_MAIN_CODE_NAME       = 'cash'
+TRASHCAN_ACCOUNT_NAME        = 'trashcan'
+RETURNED_RESOURCES           = 'returning'
+CLIENT_WALLET_MONETARY       = 'client_wallet'
 
 PURCHASE_SUPPLY_MONETARY  = 'supply from provider to stuff'
 PURCHASE_SUPPLY_MATERIAL  = 'supply from provider to stuff'
 PURCHASE_DELIVERY_PAYMENT = 'payment for delivery'
+
+SALE_CONSUMPTION_MATERIAL = 'stuff material consumption'
+SALE_CONSUMPTION_MONETARY = 'stuff monetary consumption'
+SALE_PAYMENT_MONETARY     = 'payment for the sale from client'
 
 
 def get_bookset(description):
@@ -28,6 +35,30 @@ def get_main_cashbox():
     cash = CashBox(code_name=CASHBOX_MAIN_CODE_NAME)
     cash.save()
     return cash
+
+
+def get_trashcan():
+    if Account.objects.filter(name=TRASHCAN_ACCOUNT_NAME).exists():
+        return Account.objects.get(name=TRASHCAN_ACCOUNT_NAME)
+    book = get_bookset(BOOKSET_MATERIAL_DESCRIPTION)
+    account = Account.objects.create(name=TRASHCAN_ACCOUNT_NAME, bookset=book)
+    return account
+
+
+def get_returning_resources():
+    if Account.objects.filter(name=RETURNED_RESOURCES).exists():
+        return Account.objects.get(name=RETURNED_RESOURCES)
+    book = get_bookset(BOOKSET_MONETARY_DESCRIPTION)
+    account = Account.objects.create(name=RETURNED_RESOURCES, bookset=book)
+    return account
+
+
+def get_client_wallet():
+    if Account.objects.filter(name=CLIENT_WALLET_MONETARY).exists():
+        return Account.objects.get(name=CLIENT_WALLET_MONETARY)
+    book = get_bookset(BOOKSET_MONETARY_DESCRIPTION)
+    account = Account.objects.create(name=CLIENT_WALLET_MONETARY, bookset=book)
+    return account
 
 
 class FoodStuff(models.Model):
@@ -107,6 +138,10 @@ class Product(models.Model):
         price /= Decimal(10) ** int(self.rounding)
         price = price.quantize(Decimal(1), rounding=ROUND_UP)
         price *= Decimal(10) ** int(self.rounding)
+
+        if price < self.fixed_price:
+            return self.fixed_price
+
         return price
 
 
@@ -198,6 +233,37 @@ class Sale(models.Model):
     transactions = models.ManyToManyField(
         Transaction, blank=True, editable=False)
     when = models.DateTimeField(auto_now=True)
+
+    def save(self, *args, **kwargs):
+        if self.pk:
+            return super(Sale, self).save(*args, **kwargs)
+
+        super(Sale, self).save(*args, **kwargs)
+
+        trashcan = get_trashcan()
+        returning = get_returning_resources()
+        for calc in self.offer.calculations.all():
+            need_to_consume = min(
+                calc.ingredient.stuff.get_material_count(),
+                calc.material_count
+            )
+            res = trashcan.post(
+                need_to_consume, calc.ingredient.stuff.material_account,
+                SALE_CONSUMPTION_MATERIAL)
+            self.transactions.add(res[0].transaction)
+
+            monetary_consume = need_to_consume * \
+                calc.ingredient.stuff.get_unit_cost()
+            res = returning.post(
+                monetary_consume, calc.ingredient.stuff.monetary_account,
+                SALE_CONSUMPTION_MONETARY)
+            self.transactions.add(res[0].transaction)
+
+        main_cashbox = get_main_cashbox()
+        client_wallet = get_client_wallet()
+        res = main_cashbox.account.post(
+            self.offer.price, client_wallet, SALE_PAYMENT_MONETARY)
+        self.transactions.add(res[0].transaction)
 
 
 class FoodProvider(models.Model):

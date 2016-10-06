@@ -1,11 +1,11 @@
 from django.test import TestCase
-from swingtix.bookkeeper.models import BookSet
+from swingtix.bookkeeper.models import Account, BookSet
 
 from models import (
     BOOKSET_MATERIAL_DESCRIPTION, BOOKSET_MONETARY_DESCRIPTION,
     CASHBOX_MAIN_CODE_NAME,
-    get_bookset, get_main_cashbox,
-    CashBox, FoodStuff, Recipe, RecipeIngredient, Product, SaleOffer,
+    get_bookset, get_main_cashbox, get_trashcan,
+    CashBox, FoodStuff, Recipe, RecipeIngredient, Product, SaleOffer, Sale,
     Calculation, FoodProvider, Purchase,
 )
 
@@ -28,6 +28,14 @@ class GetFunctionsTests(TestCase):
         existed = CashBox.objects.filter(
             code_name=CASHBOX_MAIN_CODE_NAME).count()
         self.assertEqual(1, existed)
+
+    def test_get_trashcan(self):
+        account = get_trashcan()
+        self.assertIsInstance(account, Account)
+        self.assertEqual(
+            BOOKSET_MATERIAL_DESCRIPTION,
+            account.bookset.description
+        )
 
 
 class FoodStuffTests(TestCase):
@@ -240,7 +248,52 @@ class CashBoxTests(TestCase):
 
 
 class SaleTests(TestCase):
-    pass
+    def setUp(self):
+        self.stuff = FoodStuff(name='some stuff 3')
+        self.stuff.save()
+
+        recipe = Recipe(name='some recipe 3')
+        recipe.save()
+
+        ingredient = RecipeIngredient(
+            stuff  = self.stuff,
+            recipe = recipe,
+            count  = 1.5
+        )
+        ingredient.save()
+
+        self.product = Product(
+            name   = 'some product 3',
+            recipe = recipe,
+            markup = 1.5
+        )
+        self.product.save()
+
+        provider = FoodProvider(name='some provider')
+        provider.save()
+
+        purchase = Purchase(
+            provider   = provider,
+            stuff      = self.stuff,
+            cost       = 200,
+            unit_count = 10,
+            unit_size  = 1,
+        )
+        purchase.save()
+
+        self.offer = SaleOffer(product=self.product)
+        self.offer.save()
+
+    def test_save(self):
+        main_cashbox = get_main_cashbox()
+
+        sale = Sale(
+            offer   = self.offer,
+            cashbox = main_cashbox,
+        )
+        sale.save()
+
+        self.assertEqual(3, sale.transactions.count())
 
 
 class FoodProviderTests(TestCase):
